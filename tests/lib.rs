@@ -18,39 +18,33 @@
 // Software.
 //http://is.gd/mKdopK
 
-#![allow(dead_code, unused_variables)]
+#![feature(io)]
 
 extern crate self_encryption;
 extern crate rand;
 extern crate tempdir;
 pub use self_encryption::*;
 use std::path::Path;
-use std::fs::File;
 use std::io::*;
+use std::fs::File;
 use tempdir::TempDir as TempDir;
 use std::string::String as String;
-use std::vec::Vec as Vec;
 
-/// DataMap integration tests/ Disk Interface test
-#[test]
-fn data_map_empty(){
-  let dm = self_encryption::datamap::DataMap::Content(vec![110,111]);
-  assert_eq!(dm.len(), 2);
-}
 
-#[test]
-fn data_map_content_only(){
-  let dm = self_encryption::datamap::DataMap::Content(vec![110,111]);
-  assert!(dm.len() == 2);
-  assert!(dm.has_chunks() == false);
-}
-
+// ToDo(Ben:2015-03-26) : random_bytes is a dumb copy from
+//                        src/lib.rs; improve
 fn random_bytes(length: usize) -> Vec<u8> {
   let mut bytes : Vec<u8> = Vec::with_capacity(length);
   for _ in (0..length) {
     bytes.push(rand::random::<u8>());
   }
   bytes
+}
+
+const DATA_SIZE : u32 = 20 * 1024 * 1024;
+
+enum StorageError {
+  Io(std::io::Error)
 }
 
 pub struct MyStorage {
@@ -61,27 +55,39 @@ impl MyStorage {
   pub fn new() -> MyStorage {
     MyStorage { temp_dir: match TempDir::new("encrypt_storage") {
         Ok(dir) => dir,
-        Err(e) => panic!("couldn't create temporary directory: {}", e)
+        Err(why) => panic!("couldn't create temporary directory: {}", Error::description(&why))
     } }
   }
 }
 
-impl Storage for MyStorage {
-  fn get(&self, name: Vec<u8>) -> Vec<u8> {
+pub trait NewStorage {
+  // TODO : the trait for fn get shall be Option<Vec<u8>> to cover the situation that cannot
+  //        fetched requested content. Instead, the current implementation return empty Vec
+  /// Fetch the data bearing the name
+  fn get(&self, name: Vec<u8>) -> Result<Vec<u8>, StorageError>;
+
+  /// Insert the data bearing the name.
+  fn put(&mut self, name: Vec<u8>, data: Vec<u8>);
+}
+
+impl NewStorage for MyStorage {
+  fn get(&self, name: Vec<u8>) -> Result<Vec<u8>, StorageError> {
     let file_name = String::from_utf8(name).unwrap();
     let file_path = self.temp_dir.path().join(Path::new(&file_name)); 
-    let mut f = match std::fs::File::open(&file_path) {
-        // The `desc` field of `IoError` is a string that describes the error
-        Err(why) => panic!("couldn't open: {}", why.description()),
-        Ok(file) => file,
-    };
-    let mut s = String::new();
+    let mut f = try!(File::open(&file_path));
+    // let mut f = match std::fs::File::open(&file_path) {
+    //     // The `desc` field of `IoError` is a string that describes the error
+    //     Err(why) => panic!("couldn't open {}: {}", file_name, Error::description(&why)),
+    //     Ok(file) => file,
+    // };
+    let mut s : Vec<u8> = Vec::new();
     //f.read_to_string(&mut s); put f into a string
-    match f.read_to_string(&mut s){
-        Err(why) => panic!("couldn't read: {}", why.description()),
-        Ok(_) => print!("contains:\n{}", s),
-    }
-    s.into_bytes()
+    try!(f.read(&mut s.as_slice()));
+    // match f.read_to_string(&mut s){
+    //     Err(why) => panic!("couldn't read {}: {}", file_name, Error::description(&why)),
+    //     Ok(_) => print!("contains:\n{}", s),
+    // }
+    Ok(s)
   }
 
   fn put(&mut self, name: Vec<u8>, data: Vec<u8>) {
@@ -89,12 +95,22 @@ impl Storage for MyStorage {
     let file_path = self.temp_dir.path().join(Path::new(&file_name)); 
     let mut f = match std::fs::File::create(&file_path) {
         // The `desc` field of `IoError` is a string that describes the error
-        Err(why) => panic!("couldn't open: {}", why.description()),
+        Err(why) => panic!("couldn't open {}: {}", file_name, Error::description(&why)),
         Ok(file) => file,
     };
     f.write_all(&data);
   }
 }
+
+
+#[test]
+fn new_read() {
+  let mut my_storage = MyStorage::new();
+  let mut data_map = datamap::DataMap::None;
+  let mut se = SelfEncryptor::new(&mut my_storage as &mut Storage, datamap::DataMap::None);
+    
+}
+
 
 #[test]
 fn check_disk(){

@@ -38,12 +38,11 @@
 
 extern crate rand;
 extern crate crypto;
-extern crate rustc_back;
+extern crate tempdir;
 use std::cmp;
 use std::num::Float as Float;
 use std::f32;
-use std::str;
-use rustc_back::tempdir::TempDir;
+use tempdir::TempDir;
 use crypto::sha2::Sha512 as Sha512;
 use crypto::digest::Digest;
 
@@ -71,7 +70,7 @@ pub fn xor(data: &[u8], pad: &[u8]) -> Vec<u8> {
 /// We will use a tempdir to stream un procesed data, although this is done vie AES streaming with
 /// a random key and IV.
 pub fn create_temp_dir() -> TempDir {
-  match rustc_back::tempdir::TempDir::new("self_encryptor") {
+  match tempdir::TempDir::new("self_encryptor") {
     Ok(dir) => dir,
     Err(e) => panic!("couldn't create temporary directory: {}", e)
   }
