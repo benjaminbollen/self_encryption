@@ -56,32 +56,20 @@ impl MyStorage {
 }
 
 impl Storage for MyStorage {
-  fn get(&self, name: Vec<u8>) -> Vec<u8> {
+  fn get(&self, name: Vec<u8>) -> Result<Vec<u8>, std::io::Error> {
     let file_name = String::from_utf8(name).unwrap();
     let file_path = self.temp_dir.path().join(Path::new(&file_name)); 
-    let mut f = match std::fs::File::open(&file_path) {
-        // The `desc` field of `IoError` is a string that describes the error
-        Err(why) => panic!("couldn't open: {}", why.description()),
-        Ok(file) => file,
-    };
-    let mut s = String::new();
-    //f.read_to_string(&mut s); put f into a string
-    match f.read_to_string(&mut s){
-        Err(why) => panic!("couldn't read: {}", why.description()),
-        Ok(_) => print!("contains:\n{}", s),
-    }
-    s.into_bytes()
+    let mut f = try!(File::open(&file_path));
+    let mut buff : Vec<u8> = Vec::new();
+    try!(f.read_to_end(&mut buff));
+    buff
   }
 
   fn put(&mut self, name: Vec<u8>, data: Vec<u8>) {
     let file_name = String::from_utf8(name).unwrap();
     let file_path = self.temp_dir.path().join(Path::new(&file_name)); 
-    let mut f = match std::fs::File::create(&file_path) {
-        // The `desc` field of `IoError` is a string that describes the error
-        Err(why) => panic!("couldn't open: {}", why.description()),
-        Ok(file) => file,
-    };
-    f.write_all(&data);
+    let mut f = try!(std::fs::File::create(&file_path));
+    try!(f.write_all(&data));
   }
 }
 

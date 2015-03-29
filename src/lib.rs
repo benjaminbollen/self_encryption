@@ -43,6 +43,9 @@ use std::cmp;
 use std::num::Float as Float;
 use std::f32;
 use std::str;
+use std::io::*;
+//use std::error::Error;
+//use std::fs::File;
 use rustc_back::tempdir::TempDir;
 use crypto::sha2::Sha512 as Sha512;
 use crypto::digest::Digest;
@@ -100,6 +103,20 @@ struct Chunks {
   location: ChunkLocation
 }
 
+pub struct StorageError {
+  description : &str,
+  cause : Some(IOError),
+}
+
+impl FromError<IOError> for StorageError {
+  fn from_error(err: IOError) -> StorageError {
+    StorageError {
+      description: "Encountered an IO error",
+      cause: Optional::<IOError>,
+    }
+  }
+}
+
 /// Storage traits of SelfEncryptor.
 /// Data stored in Storage is encrypted, name is the SHA512 hash of content.
 /// Storage can be in-memory HashMap or disk based
@@ -107,7 +124,7 @@ pub trait Storage {
   // TODO : the trait for fn get shall be Option<Vec<u8>> to cover the situation that cannot
   //        fetched requested content. Instead, the current implementation return empty Vec
   /// Fetch the data bearing the name
-  fn get(&self, name: Vec<u8>) -> Vec<u8>;
+  fn get(&self, name: Vec<u8>) -> Result<Vec<u8>, std::error::Error>;
 
   /// Insert the data bearing the name.
   fn put(&mut self, name: Vec<u8>, data: Vec<u8>);
@@ -480,7 +497,7 @@ mod test {
   }
 
   impl Storage for MyStorage {
-    fn get(&self, name: Vec<u8>) -> Vec<u8> {
+    fn get(&self, name: Vec<u8>) -> Result<Vec<u8>, std::io::Error> {
       for entry in self.entries.iter() {
         if entry.name == name { return entry.data.to_vec() }
       }
