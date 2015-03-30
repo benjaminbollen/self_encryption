@@ -176,7 +176,8 @@ fn new_read() {
     }
     //TODO(Ben:2015-03-27) Panics at MyStorage::Put, when writing datamap!
     //     Possible cause of bug, by reading sequencer over file-end
-    //se.close();
+    // does not panic anymore, remove comment if problem seems resolved
+    se.close();
   }
 }
 
